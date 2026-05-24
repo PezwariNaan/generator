@@ -38,6 +38,35 @@ impl Hash for Token {
 }
 
 impl Token {
+    fn filter_token (token: &str) -> Option<Token> {
+        let normalised = token.to_lowercase();
+
+        if normalised.len() < 3 {
+            return None;
+        }
+
+        if normalised.chars().all(|c| c.is_numeric()) {
+            return None;
+        }
+
+        if normalised.chars().all(|c| c.is_ascii_hexdigit())
+            && normalised.len() > 6 {
+            return None;
+        }
+
+        let entropy = Self::calculate_entropy(&normalised);
+        if !(0.9..=4.0).contains(&entropy) {
+            return None;
+        }
+
+        Some(Token {
+            value: normalised,
+            kind: TokenKind::Word,
+            source: "Body".to_string(),
+            entropy_score: entropy,
+        })
+    }
+
     fn flush_token(
         current: &mut String,
         tokens: &mut HashSet<Token>,
@@ -46,23 +75,23 @@ impl Token {
             return;
         }
 
-        tokens.insert(Token {
-            value: current.to_string(),
-            kind: TokenKind::Word,
-            source: "Body".to_string(),
-            entropy_score: Self::calculate_entropy(current),
-        });
-
-        for split in Self::split_token(current) {
-            tokens.insert(Token {
-                value:split,
-                kind: TokenKind::Identifier,
-                source: "Body".to_string(),
-                entropy_score: Self::calculate_entropy(current),
-            });
-        }
-        
+        let raw = current.clone();
         current.clear();
+
+        if let Some(token) = Self::filter_token(&raw) {
+            tokens.insert(token);
+        }
+
+        for split in Self::split_token(&raw) {
+            if let Some(token) = Self::filter_token(&split) {
+                tokens.insert(Token {
+                    value: token.value,
+                    kind: TokenKind::Identifier,
+                    source: "Body".to_string(),
+                    entropy_score: token.entropy_score,
+                });
+            }
+        }
     }
 
     fn calculate_entropy(input: &str) -> f64 {
@@ -84,11 +113,30 @@ impl Token {
     }
 
     fn split_token(token: &str) -> Vec<String> {
-        token
-            .split(['_', '-'])
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
+        let mut results = Vec::new();
+
+        for segment in token.split(['_', '-']) {
+            if segment.is_empty() {
+                continue;
+            }
+
+            let mut current = String::new();
+
+            for (i, ch) in segment.chars().enumerate() {
+                if i > 0 && ch.is_uppercase() {
+                    results.push(current.to_lowercase());
+                    current.clear();
+                }
+                
+                current.push(ch);
+            }
+
+            if !current.is_empty() {
+                results.push(current.to_lowercase());
+            }
+        }
+
+        results
     }
 
     fn extract_tokens(text: &str) -> HashSet<Token> {
@@ -133,6 +181,10 @@ impl Token {
         }
 
         Ok(tokens)
+    }
+
+    pub fn entropy(&self) -> f64 {
+        self.entropy_score
     }
 }
 

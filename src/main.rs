@@ -1,5 +1,7 @@
 use clap::Parser;
 use generator::Token;
+use std::cmp::Ordering;
+
 mod generator;
 
 #[derive(Parser, Debug)]
@@ -15,7 +17,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let words = Token::get_tokens(&args.url).await?;
 
-    for word in &words {
+    let mut words =  words
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    words.sort_by(|a, b| {
+        a.entropy()
+            .partial_cmp(&b.entropy())
+            .unwrap_or(Ordering::Equal)
+    });
+
+    for word in words {
         println!("{:?}", word);
     }
 
