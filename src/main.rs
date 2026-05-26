@@ -22,8 +22,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect::<Vec<_>>();
 
     words.sort_by(|a, b| {
-        a.entropy()
-            .partial_cmp(&b.entropy())
+        b.score()
+            .partial_cmp(&a.score())
             .unwrap_or(Ordering::Equal)
     });
 
