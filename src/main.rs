@@ -1,5 +1,5 @@
 use clap::Parser;
-use generator::Token;
+use crate::generator::generate::extract_tokens;
 use std::cmp::Ordering;
 
 mod generator;
@@ -15,21 +15,10 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let words = Token::get_tokens(&args.url).await?;
 
-    let mut words =  words
-        .into_iter()
-        .collect::<Vec<_>>();
+    let body = reqwest::get(args.url).await?.text().await?;
 
-    words.sort_by(|a, b| {
-        b.score()
-            .partial_cmp(&a.score())
-            .unwrap_or(Ordering::Equal)
-    });
-
-    for word in words {
-        println!("{:?}", word);
-    }
+    extract_tokens(&body);
 
     Ok(())
 }
