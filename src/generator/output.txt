@@ -1,0 +1,163 @@
+core.rs:
+pub trait Normaliser {
+    fn normalise_and_filter(&self, input:&str) -> String;
+}
+
+pub trait Splitter {
+    fn split(&self, input: &str) -> Vec<String>;
+}
+
+pub trait Scorer {
+    fn entropy(&self, token: &str) -> f64;
+    fn vowels(&self, token: &str) -> f64;
+}
+
+generator.rs:
+use crate::{
+    token::{Token, TokenKind},
+    core::{Normaliser, Splitter, Scorer};
+}
+
+pub fn build_token(raw: &str, kind:TokenKind) -> Option<Token> {
+    let normalised = normalise_and_filter(raw)?;
+    let score = Scorer::score(&normalised);
+
+    Some (Token {
+        value: normalised,
+        kind,
+        score,
+    })
+}
+
+normaliser.rs:
+pub struct BasicNormaliser;
+
+impl Normaliser for BasicNormaliser {
+    fn normalise_and_filter(token: &str) -> Option<String> {
+        if normalised.len() < 3 || normalised.len() > 32 {
+            return None;
+        }
+
+        if normalised.chars().all(|c| c.is_numeric()) {
+            return None;
+        }
+
+        if normalised.chars().all(|c| c.is_ascii_hexdigit())
+            && normalised.len() > 4 {
+            return None;
+        }
+
+        let normalised = token.to_lowercase();
+
+        Some(normalised)
+    }
+}
+scorer.rs
+use std::collections::HashMap;
+
+#[derive(Debug)]
+pub struct Score {
+    entropy: f64,
+    vowel_ratio: f64,
+    dictionary_match: bool,
+    digit_ratio: f64,
+}
+
+impl crate::core::Scorer for Score {
+    fn entropy(token: &str) -> f64 {
+        let mut counts = HashMap::new();
+
+        for ch in token.chars() {
+            *counts.entry(ch).or_insert(0usize) += 1;
+        }
+
+        let len = token.len() as f64;
+        let mut entropy = 0.0;
+
+        for count in counts.values() {
+            let p = *count as f64 / len;
+            entropy -= p * p.log2();
+        }
+
+        entropy
+    }
+
+    fn vowels(token: &str) -> f64 {
+        let vowel_count = token
+            .chars()
+            .filter(|c| "aeiou".contains(*c))
+            .count();
+
+        vowel_count as f64 / token.len() as f64
+    }
+}
+
+splitter.rs:
+struct SnakeCaseSplitter;
+struct CamelCaseSplitter;
+
+impl Splitter for SnakeCaseSplitter {
+    fn split(&self, input: &str) -> Vec<String> {
+        input
+            .split(['_','-'])
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_lowercase())
+            .collect()
+    }
+}
+
+impl Splitter for CamelCaseSplitter {
+    fn split(&self, input: &str) -> Vec<String> {
+        let mut results = Vec::new();
+        let mut current = String::new();
+
+        for (i, ch) in input.chars().enumerate() {
+            if i > 0 && ch.is_uppercase() && !current.is_empty() {
+                results.push(current.to_lowercase());
+                current.clear();
+            }
+
+            current.push(ch);
+        }
+
+        if !current.is_empty() {
+            results.push(current.to_lowercase());
+        }
+
+        results
+    }
+}
+
+token.rs
+use std::hash::{Hash, Hasher};
+use std::collections::HashSet;
+
+#[derive(Debug, Hash, Eq, PartialEq)]
+enum TokenKind {
+    Word,
+    Identifier,
+    Path,
+    Url,
+}
+
+#[derive(Debug)]
+pub struct Token {
+    value: String,
+    kind: TokenKind,
+    score: Score,
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl Eq for Token {}
+
+impl Hash for Token {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state);
+    }
+}
+
