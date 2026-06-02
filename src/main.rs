@@ -18,7 +18,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let body = reqwest::get(args.url).await?.text().await?;
 
-    extract_tokens(&body);
+    let tokens = extract_tokens(&body);
+
+    for token in &tokens {
+        if token.score.dictionary_match == true {
+            println!("{}", token.value);
+        }
+    }
 
     Ok(())
 }

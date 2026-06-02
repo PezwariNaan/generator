@@ -13,5 +13,6 @@ pub trait Splitter {
 pub trait Scorer {
     fn entropy(&self, token: &str) -> f64;
     fn vowels(&self, token: &str) -> f64;
+    fn digits(&self, token: &str) -> f64;
 }
 

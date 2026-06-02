@@ -7,6 +7,7 @@ pub struct Token {
     pub kind: TokenKind,
     pub source: String,
     pub score: Score,
+    pub occurrence: u32,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq)]

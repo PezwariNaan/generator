@@ -30,5 +30,14 @@ impl crate::generator::core::Scorer for BasicScorer {
 
         vowel_count as f64 / token.len() as f64
     }
+
+    fn digits(&self, token: &str) -> f64 {
+        let digit_count = token
+            .chars()
+            .filter(|c| c.is_numeric())
+            .count();
+
+        digit_count as f64 / token.len() as f64
+    }
 }
 

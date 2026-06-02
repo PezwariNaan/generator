@@ -4,7 +4,7 @@ use crate::generator::{
     token::{Token, TokenKind},
     core::{Splitter, Scorer, Score},
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
 // TODO:
@@ -17,40 +17,49 @@ pub static DICTIONARY: LazyLock<HashSet<&'static str>> =
             .collect()
     });
 
-pub fn extract_tokens(body: &str) {
-    let mut filtered: Vec<String> = Vec::new();
-    let mut tokens: Vec<Token> = Vec::new();
+pub static EXCLUDE: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| {
+        include_str!("../data/exclude_keywords.txt")
+            .lines()
+            .map(|s| s.trim())
+            .collect()
+    });
+
+pub fn extract_tokens(body: &str) -> HashSet<Token> {
+    let mut filtered: HashMap<String, u32> = HashMap::new();
+    let mut tokens: HashSet<Token> = HashSet::new();
     let scorer = BasicScorer;
     let splitter = SnakeCaseSplitter;
 
     for word in body.split_whitespace() {
-        let normalised = normalise_and_filter(word);
-        match normalised {
-            Some(normalised) => filtered.push(normalised),
-            None => {},
-        }
+        if let Some(normalised) = normalise_and_filter(word) {
+            *filtered.entry(normalised.clone()).or_insert(0) += 1;
+        } 
     }
 
-    for f in &filtered {
-        let splits = splitter.split(f);
+    for (word, count) in &filtered {
+        let splits = splitter.split(word);
         for split in &splits {
-            let token = build_token(split, TokenKind::Word, &scorer);
+            let occurrence = filtered
+                .get(split)
+                .copied()
+                .unwrap_or(0);
+            let token = build_token(split.as_str(), TokenKind::Word, &scorer, occurrence);
             match token {
-                Some(token) => tokens.push(token),
+                Some(token) => _ = tokens.insert(token),
                 None => {},
             }
         }
     }
 
-    for token in tokens {
-        println!("{:?}", token);
-    }
+    tokens
 }
 
 fn build_token(
     raw: &str,
     kind:TokenKind,
     scorer: &dyn Scorer,
+    occurrence: u32,
     ) -> Option<Token> {
 
     let mut score: Score = Score::default(); 
@@ -58,6 +67,7 @@ fn build_token(
     let normalised = normalise_and_filter(raw)?;
     score.entropy  = scorer.entropy(normalised.as_str());
     score.vowel_ratio = scorer.vowels(normalised.as_str());
+    score.digit_ratio = scorer.digits(normalised.as_str());
     score.dictionary_match = DICTIONARY.contains(normalised.as_str());
 
     Some (Token {
@@ -65,6 +75,7 @@ fn build_token(
         kind,
         source: "Body".to_string(),
         score: score,
+        occurrence,
     })
 }
 
@@ -72,6 +83,10 @@ fn normalise_and_filter(token: &str) -> Option<String> {
     let normalised = token.to_lowercase();
 
     if normalised.len() < 3 || normalised.len() > 32 {
+        return None;
+    }
+
+    if EXCLUDE.contains(normalised.as_str()) {
         return None;
     }
 
