@@ -1,7 +1,7 @@
 use crate::generator::core::Splitter;
 
-struct SnakeCaseSplitter;
-struct CamelCaseSplitter;
+pub struct SnakeCaseSplitter;
+pub struct CamelCaseSplitter;
 
 impl Splitter for SnakeCaseSplitter {
     fn split(&self, input: &str) -> Vec<String> {

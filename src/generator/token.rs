@@ -1,5 +1,4 @@
 use std::hash::{Hash, Hasher};
-use std::collections::HashSet;
 use crate::generator::core::Score;
 
 #[derive(Debug)]

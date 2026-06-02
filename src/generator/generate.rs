@@ -1,16 +1,27 @@
 use crate::generator::{
+    splitter::{CamelCaseSplitter, SnakeCaseSplitter},
     scorer::BasicScorer,
     token::{Token, TokenKind},
     core::{Splitter, Scorer, Score},
 };
+use std::collections::HashSet;
+use std::sync::LazyLock;
 
 // TODO:
 // Add splitters
+
+pub static DICTIONARY: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| {
+        include_str!("../data/words_alpha.txt")
+            .lines()
+            .collect()
+    });
 
 pub fn extract_tokens(body: &str) {
     let mut filtered: Vec<String> = Vec::new();
     let mut tokens: Vec<Token> = Vec::new();
     let scorer = BasicScorer;
+    let splitter = SnakeCaseSplitter;
 
     for word in body.split_whitespace() {
         let normalised = normalise_and_filter(word);
@@ -21,10 +32,13 @@ pub fn extract_tokens(body: &str) {
     }
 
     for f in &filtered {
-        let token = build_token(f, TokenKind::Word, &scorer);
-        match token {
-            Some(token) => tokens.push(token),
-            None => {},
+        let splits = splitter.split(f);
+        for split in &splits {
+            let token = build_token(split, TokenKind::Word, &scorer);
+            match token {
+                Some(token) => tokens.push(token),
+                None => {},
+            }
         }
     }
 
@@ -42,8 +56,9 @@ fn build_token(
     let mut score: Score = Score::default(); 
 
     let normalised = normalise_and_filter(raw)?;
-    score.entropy  = scorer.entropy(raw);
-    score.vowel_ratio = scorer.vowels(raw);
+    score.entropy  = scorer.entropy(normalised.as_str());
+    score.vowel_ratio = scorer.vowels(normalised.as_str());
+    score.dictionary_match = DICTIONARY.contains(normalised.as_str());
 
     Some (Token {
         value: normalised,
